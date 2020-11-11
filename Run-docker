@@ -1,0 +1,62 @@
+#!/bin/sh
+# Run simpleIde docker image with handling of user etc
+
+# Ugly: allow X access
+xhost +
+image="simpleIde"
+
+# Preserve equivalent working directory if possible
+
+unset chdir chdirName
+case "$PWD" in
+("$HOME"/Programming | "$HOME"/Programming/*)
+    chdir=$(echo "$PWD" | sed -e "s#^${HOME}/#/home/user/#")
+    chdirName=$(echo "$PWD" | sed -e "s#${HOME}/#~/#")
+    ;;
+esac
+
+
+# Echo options/arguments for mount points
+mount_points()
+{
+    if [ -d "$HOME"/Programming ]
+    then
+        echo '-v' "$HOME"/Programming:/home/user/Programming
+    else
+        echo "No ~/Programming as mount-point" 1>&2
+    fi
+    if [ -d "$HOME"/Documents/Uni ]
+    then
+        echo '-v' "$HOME"/Documents/Uni:/home/user/Documents/Uni
+    else
+        echo "No ~/Documents/Uni as mount-point" 1>&2
+    fi
+}
+
+# Mount points for X-windows
+mount_x11()
+{
+    echo '-v' /tmp/.X11-unix:/tmp/.X11-unix
+}
+
+cat << INFORMATION 1>&2
+---------------
+Image:  $image
+Mount:  ~/Programming
+Dir:    ${chdirName:-~/}
+Cmd:    $@
+---------------
+INFORMATION
+
+
+docker run --rm -t -i \
+   -e DISPLAY \
+   -e USERID="$(id -u)" \
+   -e CHDIR="$chdir" \
+   --device /dev/ttyUSB0 \
+   $(mount_x11) \
+   $(mount_points) \
+   "$image" \
+   /entrypoint "$@"
+
+# --------------------------------------------------------------------------
