@@ -1,37 +1,130 @@
 #!/bin/sh
-# Run simpleIde docker image with handling of user etc
+# Run simple-ide docker image with handling of user etc
+# ---------------------------------------------------------------------------
+# scriptDir="$(cd ${0%/*} && pwd -L)"
 
 # Ugly: allow X access
-xhost +
-image="simpleIde"
+xhost + 2>/dev/null
 
+image="simple-ide"
+devices="/dev/ttyUSB0"
+mounts="Coding Documents Programming"
+
+# ---------------------------------------------------------------------------
+# parse options : could/should improve this
+unset cmd optVerbose
+
+# Preload favoured command based on script name
+case "${0##*/}" in
+*simple-ide)
+   cmd="simpleide"
+   ;;
+esac
+
+
+while [ "$#" -gt 0 ]
+do
+    case "$1" in
+    -h | -help* )
+        echo "No help"
+        exit 0  # A clean exit
+        ;;
+    -no-dev* | -without-dev* )
+        unset devices
+        echo "disabled device export" 1>&2
+        ;;
+    -run )
+        cmd="simpleide"
+        ;;
+    -v | -verb* )
+        optVerbose=true
+        ;;
+    *)
+        break
+        ;;
+    esac
+    shift
+done
+
+if [ -n "$optVerbose" ]
+then
+    report()
+    {
+        while [ "$#" -gt 0 ]
+        do
+            echo "$1" 1>&2; shift
+        done
+    }
+else
+    report() { true; }
+fi
+
+
+# Hack - drop in a config directory to maintain persistent
+# config information from the docker instance
+
+parallaxConfigHost="$HOME/docker-export/config"
+parallaxConfigGuest="/home/user/.config"
+mkdir -p "$parallaxConfigHost"
+
+report "Host  config dir: $parallaxConfigHost"
+report "Guest config dir: $parallaxConfigGuest"
+
+# Check mounts from the home directory
 # Preserve equivalent working directory if possible
 
 unset chdir chdirName
-case "$PWD" in
-("$HOME"/Programming | "$HOME"/Programming/*)
-    chdir=$(echo "$PWD" | sed -e "s#^${HOME}/#/home/user/#")
-    chdirName=$(echo "$PWD" | sed -e "s#${HOME}/#~/#")
-    ;;
-esac
+dirName="${PWD#${HOME}/}"
+
+if [ "$dirName" != "$PWD" ]
+then
+    for homedir in $mounts
+    do
+        case "$dirName" in
+        ("$homedir" | "$homedir"/*)
+            chdir="/home/user/$dirName"
+            chdirName="~/$dirName"
+            break
+            ;;
+        esac
+    done
+fi
 
 
 # Echo options/arguments for mount points
 mount_points()
 {
-    if [ -d "$HOME"/Programming ]
+    local missing
+
+    # Hack in ParallaxInc config directory
+
+    if [ -d "$parallaxConfigHost" ]
     then
-        echo '-v' "$HOME"/Programming:/home/user/Programming
+        echo '-v' "${parallaxConfigHost}:${parallaxConfigGuest}"
     else
-        echo "No ~/Programming as mount-point" 1>&2
+        echo "Help. No $parallaxConfigHost" 1>&2
     fi
-    if [ -d "$HOME"/Documents/Uni ]
-    then
-        echo '-v' "$HOME"/Documents/Uni:/home/user/Documents/Uni
-    else
-        echo "No ~/Documents/Uni as mount-point" 1>&2
-    fi
+
+    for homedir in $mounts
+    do
+        if [ -d "$HOME/$homedir" ]
+        then
+            echo '-v' "$HOME/$homedir":/home/user/"$homedir"
+        else
+            missing="$missing ~/$homedir"
+        fi
+    done
+
+#    ## if [ -n "$missing" ]
+#    if false  # skip warnings
+#    then
+#        cat << WARNING 1>&2
+#Missing some mount points - this can be normal
+#    $missing
+#WARNING
+#    fi
 }
+
 
 # Mount points for X-windows
 mount_x11()
@@ -39,12 +132,42 @@ mount_x11()
     echo '-v' /tmp/.X11-unix:/tmp/.X11-unix
 }
 
+
+# Echo options/arguments for mounting devices
+mount_devices()
+{
+    local missing name
+
+    for name in $devices
+    do
+        if [ -e "$name" ]
+        then
+            echo '--device' "$name"
+        else
+            missing="$missing $name"
+        fi
+    done
+
+    if [ -n "$missing" ]
+    then
+        cat << WARNING 1>&2
+Missing various devices - reduce your expectations
+
+    $missing
+
+WARNING
+    fi
+}
+
+
+# Ready to launch
+
 cat << INFORMATION 1>&2
 ---------------
 Image:  $image
 Mount:  ~/Programming
 Dir:    ${chdirName:-~/}
-Cmd:    $@
+Cmd:    $cmd${cmd:+ }$@
 ---------------
 INFORMATION
 
@@ -53,10 +176,10 @@ docker run --rm -t -i \
    -e DISPLAY \
    -e USERID="$(id -u)" \
    -e CHDIR="$chdir" \
-   --device /dev/ttyUSB0 \
+   $(mount_devices) \
    $(mount_x11) \
    $(mount_points) \
    "$image" \
-   /entrypoint "$@"
+   /entrypoint $cmd "$@"
 
 # --------------------------------------------------------------------------

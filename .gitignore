@@ -1,6 +1,9 @@
 # git-ls-files --others --exclude-from=.git/info/exclude
 # Lines that start with '#' are comments.
 
+# configuration file of SimpleIDE
+SimpleIDE.conf
+
 # Editor and misc backup files - anywhere
 *~
 .*~

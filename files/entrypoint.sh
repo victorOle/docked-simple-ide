@@ -6,7 +6,7 @@
 # Uses chroot, but could use setpriv, su-exec, gosu
 
 : "${CHDIR:=}"
-: "${USERID:=9001}"
+: "${USERID:=9001}"  # Probably nobody
 
 USERNAME=user
 

@@ -6,6 +6,8 @@ a docker instance.  (WIP)
 # Preliminaries
 
 Install, configure docker on host system
+ - add yourself to group docker in /etc/group
+ - make docker service start on boot or start it every time using `systemctl start docker`
 
 
 Fetch debian/ubuntu package (caution: _old_)
@@ -18,11 +20,12 @@ deb="simple-ide_1-0-1-rc1_amd64.deb"
 wget "$url/$deb"
 ```
 
-Create docker image and tag with something memorable
+Create docker image and tag with something memorable, but "simple-ide"
+is what the Run script expects, so that is the best one to use.
 ```
 docker build .
 
-docker tag <some-id> simpleIde
+docker tag <some-id> simple-ide
 ```
 
 

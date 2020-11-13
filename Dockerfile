@@ -1,31 +1,26 @@
-# To use:
-#
-# Try to get this rubbish running
-# xhost +
-#
-# docker run --rm -t -i \
-#       -v /tmp/.X11-unix:/tmp/.X11-unix \
-#       -e DISPLAY=$DISPLAY \
-#	--device /dev/dri \
-#       imageName
+# See associated Run-docker script for run magic
 
 # Base docker image
 FROM ubuntu:focal
 
-RUN apt install -y vim-tiny sudo
-
-# Old qt4
+# Need old qt4
 COPY files/sources.list.d/rock-core-ubuntu-qt4.list \
     /etc/apt/sources.list.d/rock-core-ubuntu-qt4.list
 
-RUN apt update --allow-unauthenticated
-
 COPY simple-ide_1-0-1-rc1_amd64.deb .
 
-RUN apt install -y ./simple-ide_1-0-1-rc1_amd64.deb
+# Update with  --allow-unauthenticated since we have
+# had problems with the ppa repo and we just want to get
+# it running
 
-# REMOVE simple-ide_1-0-1-rc1_amd64.deb .
+RUN apt update --allow-unauthenticated \
+ && apt install -y --no-install-recommends \
+    vim-tiny sudo \
+ && apt install -y --no-install-recommends \
+    ./simple-ide_1-0-1-rc1_amd64.deb \
+ && rm -rf /var/lib/apt/lists/* \
+ && rm -rf simple-ide_1-0-1-rc1_amd64.deb
 
 COPY files/entrypoint.sh /entrypoint
 
-## ENTRYPOINT [ "xeyes" ]
+## ENTRYPOINT [ "program" ]
